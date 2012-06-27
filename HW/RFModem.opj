@@ -1,0 +1,94 @@
+(ExpressProject "RFModem"
+  (ProjectVersion "19981106")
+  (ProjectType "PCB")
+  (Folder "Design Resources"
+    (Folder "Library")
+    (NoModify)
+    (File ".\rfmodem.dsn"
+      (Type "Schematic Design"))
+    (BuildFileAddedOrDeleted "x")
+    (CompileFileAddedOrDeleted "x"))
+  (Folder "Outputs")
+  (Folder "Referenced Projects")
+  (PartMRUSelector
+    ("CAP NP"
+      (FullPartName "CAP NP.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\DISCRETE.OLB")
+      (DeviceIndex "0"))
+    (CAP
+      (FullPartName "CAP.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\DISCRETE.OLB")
+      (DeviceIndex "0"))
+    (GND
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\CAPSYM.OLB")
+      (DeviceIndex "0"))
+    (LT1117-3.3/SO
+      (FullPartName "LT1117-3.3/SO.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\REGULATOR.OLB")
+      (DeviceIndex "0"))
+    (PIC16LF1824
+      (FullPartName "PIC16LF1824.Normal")
+      (LibraryName "C:\KASYANOV\PROJECTS\LIBORCAD\MY.OLB")
+      (DeviceIndex "0"))
+    (PIC16C642_SO
+      (FullPartName "PIC16C642_SO.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\MICROCONTROLLER.OLB")
+      (DeviceIndex "0"))
+    (OFFPAGELEFT-R
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\CAPSYM.OLB")
+      (DeviceIndex "0"))
+    (R
+      (FullPartName "R.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\DISCRETE.OLB")
+      (DeviceIndex "0"))
+    (ZTA
+      (FullPartName "ZTA.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\DISCRETE.OLB")
+      (DeviceIndex "0"))
+    (BNC
+      (FullPartName "BNC.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\CONNECTOR.OLB")
+      (DeviceIndex "0"))
+    (INDUCTOR/SM
+      (FullPartName "INDUCTOR/SM.Normal")
+      (LibraryName "C:\PROGRAM FILES\ORCAD\CAPTURE\LIBRARY\DISCRETE.OLB")
+      (DeviceIndex "0"))
+    (MRF49XA
+      (FullPartName "MRF49XA.Normal")
+      (LibraryName "C:\KASYANOV\PROJECTS\LIBORCAD\MY.OLB")
+      (DeviceIndex "0")))
+  (LastUsedLibraryBrowseDirectory "C:\Program Files\Orcad\Capture\Library")
+  (GlobalState
+    (FileView
+      (Path "Design Resources")
+      (Path "Design Resources" "c:\kasyanov\projects\rf_sensor\rfmodem.dsn")
+      (Path "Design Resources" "c:\kasyanov\projects\rf_sensor\rfmodem.dsn"
+         "SCHEMATIC1")
+      (Select "Design Resources" "c:\kasyanov\projects\rf_sensor\rfmodem.dsn"
+         "SCHEMATIC1" "PAGE1"))
+    (HierarchyView)
+    (Doc
+      (Type "COrCapturePMDoc")
+      (Frame
+        (Placement "44 0 1 -1 -1 -4 -30 0 200 0 572"))
+      (Tab 0))
+    (Doc
+      (Type "COrSchematicDoc")
+      (Frame
+        (Placement "44 2 1 0 865 -4 -30 66 1126 87 693")
+        (Scroll "0 0")
+        (Zoom "103")
+        (Occurrence "/"))
+      (Path "C:\KASYANOV\PROJECTS\RF_SENSOR\RFMODEM.DSN")
+      (Schematic "SCHEMATIC1")
+      (Page "PAGE1"))
+    (Doc
+      (Type "COrSchematicDoc")
+      (Frame
+        (Placement "44 2 3 -1 -1 -4 -30 124 1180 201 803")
+        (Scroll "0 0")
+        (Zoom "103")
+        (Occurrence "/"))
+      (Path "C:\KASYANOV\PROJECTS\RF_SENSOR\RFMODEM.DSN")
+      (Schematic "SCHEMATIC1")
+      (Page "PAGE2"))))

@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<history>
+   <processor signature="4.5.2 -O0 -nostartfiles -Map=RF-Transmit-103.map -mcpu=cortex-m3 -mthumb -LC:\Kasyanov\Projects\RF\RF-Transmit-103 --gc-sections -TC:\Kasyanov\Projects\RF\RF-Transmit-103\link.ld -g">
+      <target file="RF-Transmit-103.elf" lastModified="1382c27dc5e">
+         <source file="..\obj\core_cm3.o" lastModified="1382c1afbc1"/>
+         <source file="..\obj\system_stm32f10x.o" lastModified="1382c1afc6d"/>
+         <source file="..\obj\startup_stm32f10x_hd.o" lastModified="1382c1afccb"/>
+         <source file="..\obj\stm32f10x_gpio.o" lastModified="1382c1afda5"/>
+         <source file="..\obj\main.o" lastModified="1382c27db93"/>
+         <source file="..\obj\stm32f10x_rcc.o" lastModified="1382c1b0026"/>
+         <source file="..\obj\stm32f10x_exti.o" lastModified="1382c1b00d2"/>
+         <source file="..\obj\stm32f10x_usart.o" lastModified="1382c1b01cc"/>
+         <source file="..\obj\misc.o" lastModified="1382c1b0288"/>
+      </target>
+   </processor>
+</history>
