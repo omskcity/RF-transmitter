@@ -37,16 +37,16 @@ unsigned short Crc16(unsigned char *pcBlock, unsigned int len);
 
 
 // Константы для управления радиомодулем
-const long    GENCREG 		= 0x8018;		// Cload=12.5pF; TX registers & FIFO are disabled
-const long    PMCREG 		= 0x8200;		// Everything off, uC clk enabled
-const long    RXCREG 		= 0x94A1;		// BW=135kHz, DRSSI=-97dBm, pin8=VDI, fast VDI
-const long    TXBREG 		= 0xB800;
-const long    FIFORSTREG	= 0xCA81;		// Sync. latch cleared, limit=8bits, disable sensitive reset
-const long    BBFCREG 		= 0xC22C;		// Digital LPF (default)
-const long    AFCCREG		= 0xC4D7;		// Auto AFC (default)
-const long    CFSREG 		= 0xA4D8;		// Fo=433.100MHz
-const long    TXCREG		= 0x9830;		// df=60kHz, Pmax, normal modulation polarity
-const long    DRSREG 		= 0xC623;		// 9579Baud (default)
+#define			GENCREG 	0x8018		// Cload=12.5pF; TX registers & FIFO are disabled
+#define    		PMCREG 		0x8200		// Everything off, uC clk enabled
+#define    		RXCREG 		0x94A1		// BW=135kHz, DRSSI=-97dBm, pin8=VDI, fast VDI
+#define    		TXBREG 		0xB800
+#define    		FIFORSTREG	0xCA81		// Sync. latch cleared, limit=8bits, disable sensitive reset
+#define    		BBFCREG 	0xC22C		// Digital LPF (default)
+#define    		AFCCREG		0xC4D7		// Auto AFC (default)
+#define    		CFSREG 		0xA4D8		// Fo=433.100MHz
+#define    		TXCREG		0x9830		// df=60kHz, Pmax, normal modulation polarity
+#define    		DRSREG 		0xC623		// 9579Baud (default)
 
 #define			dRXBufferLong	255		// Длина буфера приемника радиомодуля. Т.е. максимальная длина пакета
 #define			TimeOutReceivePacket	100	// Тайм-аут при приёме по USART. В мсек.
