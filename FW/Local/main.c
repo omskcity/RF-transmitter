@@ -1,21 +1,12 @@
-// Приемо-передатчик
-// Новый RF для STM32F100RBT
-// Коммент.
-/*
- * Приемо-передатчик с UART.
- *
- * Принцип. Устройство слушает эфир и если в нём пошла нормальная посылка, то первый байт считается длиной посылки,
- * потом сама посылка, и завершает два байта CRC 16. Если CRC подсчитанный не совпадает с переданной - пакет отбрасывается.
- *
- * Если что-то прилетает по UART... Захватываем символ в буфер. И продолжаем это делать пока не прекратиться поток и не пройдет
- * таймаут (TimeOutReceivePacket  мс). Далее считается CRC 16, добавляется в конец пакета и отправляется в эфир.
-*/
+// Добавляю массив из удаленных датчиков.
+// При запросе - выдаю информацию по всем.
 
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
 #include "stm32f10x_usart.h"
 #include "stm32f10x_exti.h"
+#include "stm32f10x_flash.h"
 #include "misc.h"
 
 // Обработчик прерывания от системного таймера
@@ -32,9 +23,22 @@ void MRF49XA_Reset_Radio(void);
 // Системные функции
 void DelayMs( uint16_t);
 void putstr(char *, unsigned int);
+void putstr2(char *, unsigned int);
+
 unsigned short Crc16(unsigned char *pcBlock, unsigned int len);
 
 
+
+void Flash_read(void);
+uint8_t Flash_ready1(void);
+void Flash_unlock(void);
+void Flash_lock(void);
+void Flash_erase_page(uint32_t);
+void Flash_write(void);
+
+
+
+#define			MaxNumberTransmitter	10		// кол-во удаленных модулей, обслуживаемых модемом
 
 // Константы для управления радиомодулем
 #define			GENCREG 	0x8018		// Cload=12.5pF; TX registers & FIFO are disabled
@@ -68,16 +72,25 @@ struct {
 	unsigned char	check;
 } sTXBuffer;
 
-
+// Буфер приемника USART
 struct {
+	unsigned char	ucData[dRXBufferLong];
+	unsigned int	uiWR;
+	unsigned int	TimeOut;
+	unsigned char	check;
+} sTXBuffer2;
+
+
+struct tCounter {
 	unsigned int	id;
 	unsigned short	vbat;
 	unsigned char	sense;
 	unsigned int	counter1;
 	unsigned int	counter2;
 	unsigned int	npacket;
-} Counter;
+};
 
+struct tCounter Counter[MaxNumberTransmitter];
 
 unsigned int bl;					// Используется при радиоприеме.
 
@@ -292,6 +305,17 @@ void putstr(char *a, unsigned int i) {
 	LED1_OFF;								// выключаем светодиод UART (2)
 }
 
+// Отправить буфер в UART
+void putstr2(char *a, unsigned int i) {
+	LED1_ON;								// включаем светодиод UART (2)
+	while (i--) {							// Отправляем буфер побайтно
+		while( !USART_GetFlagStatus(USART3,USART_FLAG_TXE));
+		USART_SendData(USART3,*a);
+		a++;
+	}
+	LED1_OFF;								// выключаем светодиод UART (2)
+}
+
 // Организация задержки
 void DelayMs( uint16_t a) {
 	volatile uint16_t b;
@@ -335,6 +359,7 @@ void GPIO_Configuration(void) {
 	USART_InitTypeDef USART_InitStructure;
 
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_USART1 | RCC_APB2Periph_AFIO, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
 
 	GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
 
@@ -367,10 +392,21 @@ void GPIO_Configuration(void) {
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
+    /* Configure USART3 Rx (PB11) as input floating                         */
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+
     /* Configure USART1 Tx (PA9) as alternate function push-pull            */
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_9;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* Configure USART3 Tx (PB10) as alternate function push-pull            */
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
 
     USART_InitStructure.USART_BaudRate            = 9600;
     USART_InitStructure.USART_WordLength          = USART_WordLength_8b;
@@ -381,7 +417,12 @@ void GPIO_Configuration(void) {
     USART_Init(USART1, &USART_InitStructure);
     USART_Cmd(USART1, ENABLE);
 
+    USART_Init(USART3, &USART_InitStructure);
+    USART_Cmd(USART3, ENABLE);
+
+
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);					// Разрешим прерывания от USART1 при приеме в буфер
+    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);					// Разрешим прерывания от USART3 при приеме в буфер
 }
 
 
@@ -410,8 +451,15 @@ void NVIC_Configuration(void)
     NVIC_Init(&NVIC_InitStructure);
 
 
-    // Включение прерывания от USART
+    // Включение прерывания от USART1
     NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    // Включение прерывания от USART3
+    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
@@ -446,13 +494,7 @@ void EXTI15_10_IRQHandler(void) {
 				// Считаем CRC
 				crc = sRXBuffer.ucData[bl - 1] * 256 + sRXBuffer.ucData[bl - 2];
 				if ( crc == Crc16(sRXBuffer.ucData,sRXBuffer.uiPL) ) {
-
-								Counter.id=sRXBuffer.ucData[0] + (sRXBuffer.ucData[1]<<8) + (sRXBuffer.ucData[2]<<16) + (sRXBuffer.ucData[3]<<24);
-								Counter.vbat=sRXBuffer.ucData[4] + sRXBuffer.ucData[5]*256;
-								Counter.sense = sRXBuffer.ucData[6];
-								Counter.counter1=sRXBuffer.ucData[7] + (sRXBuffer.ucData[8]<<8) + (sRXBuffer.ucData[9]<<16);
-								Counter.counter2=sRXBuffer.ucData[10] + (sRXBuffer.ucData[11]<<8) + (sRXBuffer.ucData[12]<<16);
-								Counter.npacket = sRXBuffer.ucData[13];
+								CommitData();
 				}
 				// Сбрасываем радиомодуль и буфер, выключаем светодиод RADIO (1)
 				MRF49XA_Reset_Radio();
@@ -495,6 +537,26 @@ void USART1_IRQHandler(void) {
 	}
 }
 
+/******************************************************************************
+  * @brief  Обработчик прерывания от USART1
+  * @param  None
+  * @retval None
+*******************************************************************************/
+void USART3_IRQHandler(void) {
+	if (USART_GetITStatus(USART3, USART_IT_RXNE) != RESET) {
+		if( sTXBuffer2.uiWR == 0 ) LED1_ON;						// Первый символ. Включаем светодиод UART (2)
+
+		// Читаем байт в буфер и сдвигаем указатель
+		sTXBuffer2.ucData[sTXBuffer2.uiWR++] = USART_ReceiveData(USART3);
+		sTXBuffer2.TimeOut = 0;									// Сбрасываем таймер тайм-аута
+
+		if (sTXBuffer2.uiWR >= dRXBufferLong) { 					// Если прочитали последний байт, то ...
+			USART_ITConfig(USART3,USART_IT_RXNE,DISABLE);		// Запрещаем прерывание от USART чтобы не переполнить буфер
+			sTXBuffer2.TimeOut = TimeOutReceivePacket;			// Таймер тайм-аута устанавливаем в переполненное состояние
+		}
+	}
+}
+
 
 /******************************************************************************
   * @brief  Обработчик прерывания от SysTick
@@ -509,27 +571,55 @@ void SysTick_Handler(void) {
 		if (sTXBuffer.TimeOut >= TimeOutReceivePacket) {		// Если произошло переполнение таймера, то отправляем пакет в радио
 			USART_ITConfig(USART1,USART_IT_RXNE,DISABLE);		// Запрещаем прерывание от USART чтобы не переполнить буфер
 			sTXBuffer.check=1;
-//			MRF49XA_Send_Packet(sTXBuffer.ucData, sTXBuffer.uiWR);
 			sTXBuffer.uiWR = 0;									// Отчищаем буфер USART
 			LED1_OFF;											// Выключаем светодиод UART (2)
 			USART_ITConfig(USART1,USART_IT_RXNE,ENABLE);		// Разрешаем прерывание от USART
 		}
 	}
+
+	if (sTXBuffer2.uiWR) {										// Если начался прием по USART
+		sTXBuffer2.TimeOut++;									// Увеличим таймер тайм-аута
+		if (sTXBuffer2.TimeOut >= TimeOutReceivePacket) {		// Если произошло переполнение таймера, то отправляем пакет в радио
+			USART_ITConfig(USART3,USART_IT_RXNE,DISABLE);		// Запрещаем прерывание от USART чтобы не переполнить буфер
+			sTXBuffer2.check=1;
+			sTXBuffer2.uiWR = 0;									// Отчищаем буфер USART
+			LED1_OFF;											// Выключаем светодиод UART (2)
+			USART_ITConfig(USART3,USART_IT_RXNE,ENABLE);		// Разрешаем прерывание от USART
+		}
+	}
+
+
 }
 
 
 
+void CommitData() {
+	unsigned int dev;
+	unsigned int p=0;
+
+	dev = sRXBuffer.ucData[0] + (sRXBuffer.ucData[1]<<8) + (sRXBuffer.ucData[2]<<16) + (sRXBuffer.ucData[3]<<24);
+
+	while( ((Counter[p].id) != dev) & (p != MaxNumberTransmitter) ) p++;
+
+	if( p != MaxNumberTransmitter ) {
+	Counter[p].id=dev;
+	Counter[p].vbat=sRXBuffer.ucData[4] + sRXBuffer.ucData[5]*256;
+	Counter[p].sense = sRXBuffer.ucData[6];
+	Counter[p].counter1=sRXBuffer.ucData[7] + (sRXBuffer.ucData[8]<<8) + (sRXBuffer.ucData[9]<<16);
+	Counter[p].counter2=sRXBuffer.ucData[10] + (sRXBuffer.ucData[11]<<8) + (sRXBuffer.ucData[12]<<16);
+	Counter[p].npacket = sRXBuffer.ucData[13];
+	}
+}
+
 
 int main(void) {
+	unsigned int i;
+	unsigned char d[10] = { 1,2,3,4,5,6,7,8,9,0 };
 
 	SystemInit();
+// Считаем конфу из FLASH
+	Flash_read();
 
-	Counter.id =0;
-	Counter.vbat =0;
-	Counter.counter1 =0;
-	Counter.counter2 =0;
-	Counter.sense =0;
-	Counter.npacket =0;
 	GPIO_Configuration();
 
 	LED1_ON;
@@ -545,20 +635,93 @@ int main(void) {
 		if( sTXBuffer.check )
 		{
 			sTXBuffer.check = 0;
-
+// Запись нового передатчика в память
+			if( sTXBuffer.ucData[0] =='W'  ) {
+				i = (sTXBuffer.ucData[5]<<24) + (sTXBuffer.ucData[4]<<16) + (sTXBuffer.ucData[3]<<8) + sTXBuffer.ucData[2];
+				Counter[sTXBuffer.ucData[1]].id = i;
+				// Закинем всё во FLASH (как EEPROM)
+				Flash_write();
+			}
+// Выдать данные н-ного передатчика в УАРТ
 			if( sTXBuffer.ucData[0] =='R'  ) {
+				i=0;
+				if ( sTXBuffer.ucData[1] < MaxNumberTransmitter)
+				{
+					putstr(&Counter[sTXBuffer.ucData[1]].id,4);
+					putstr(&Counter[sTXBuffer.ucData[1]].vbat,2);
+					putstr(&Counter[sTXBuffer.ucData[1]].sense,1);
+					putstr(&Counter[sTXBuffer.ucData[1]].counter1,3);
+					putstr(&Counter[sTXBuffer.ucData[1]].counter2,3);
+					putstr(&Counter[sTXBuffer.ucData[1]].npacket,1);
 
-				putstr(&Counter.id,4);
-				putstr(&Counter.vbat,2);
-				putstr(&Counter.sense,1);
-				putstr(&Counter.counter1,3);
-				putstr(&Counter.counter2,3);
-				putstr(&Counter.npacket,1);
+				}
 			}
 		}
+		if( sTXBuffer2.check )
+		{
+			sTXBuffer2.check = 0;
+// Запись нового передатчика в память
+			if( sTXBuffer2.ucData[0] =='W'  ) {
+				i = (sTXBuffer2.ucData[5]<<24) + (sTXBuffer2.ucData[4]<<16) + (sTXBuffer2.ucData[3]<<8) + sTXBuffer2.ucData[2];
+				Counter[sTXBuffer2.ucData[1]].id = i;
+				// Закинем всё во FLASH (как EEPROM)
+				Flash_write();
+			}
+// Выдать данные н-ного передатчика в УАРТ
+			if( sTXBuffer2.ucData[0] =='R'  ) {
+				i=0;
+				if ( sTXBuffer2.ucData[1] < MaxNumberTransmitter)
+				{
+					putstr2(&Counter[sTXBuffer2.ucData[1]].id,4);
+					putstr2(&Counter[sTXBuffer2.ucData[1]].vbat,2);
+					putstr2(&Counter[sTXBuffer2.ucData[1]].sense,1);
+					putstr2(&Counter[sTXBuffer2.ucData[1]].counter1,3);
+					putstr2(&Counter[sTXBuffer2.ucData[1]].counter2,3);
+					putstr2(&Counter[sTXBuffer2.ucData[1]].npacket,1);
+
+				}
+			}
+		}
+
+
 	}
 }
 
+
+//#define Flash_START_ADDR  ((uint32_t)0x0800FC00)
+#define Flash_START_ADDR  ((uint32_t)0x0800F000)
+
+void Flash_read(void) {
+	unsigned int i;
+	i=0;
+	while( i < MaxNumberTransmitter ) {
+	Counter[i].id = (*(__IO uint32_t*) (Flash_START_ADDR + i*4));
+	Counter[i].vbat =0;
+	Counter[i].counter1 =0;
+	Counter[i].counter2 =0;
+	Counter[i].sense =0;
+	Counter[i].npacket =0;
+	i++;
+	}
+}
+
+void Flash_write(void) {
+	unsigned int i;
+	uint32_t data;
+	LED1_ON;
+
+	FLASH_Unlock();
+
+	FLASH_ErasePage(Flash_START_ADDR);
+
+	i=0;
+	while( i < MaxNumberTransmitter ) {
+		FLASH_ProgramWord(Flash_START_ADDR + i*4, Counter[i].id);
+		i++;
+	}
+	FLASH_Lock();
+	LED1_OFF;
+}
 
 #ifdef  USE_FULL_ASSERT
 /**
